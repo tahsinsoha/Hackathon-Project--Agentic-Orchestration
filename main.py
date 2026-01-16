@@ -1,9 +1,14 @@
 """Main entry point for Incident Autopilot."""
 import asyncio
 import argparse
+import os
+from dotenv import load_dotenv
 from core.pipeline import IncidentPipeline
 from core.state import incident_store
 from simulator.scenarios import IncidentSimulator
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 async def run_demo(incident_type: str = None):
