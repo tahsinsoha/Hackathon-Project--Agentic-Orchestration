@@ -50,7 +50,8 @@ class IncidentPipeline:
         context = {
             "incident": incident,
             "current_metrics": current_metrics,
-            "baseline_metrics": baseline_metrics
+            "baseline_metrics": baseline_metrics,
+            "detection_start": detection_start  # Pass start time to calculate metrics later
         }
         
         try:
@@ -76,9 +77,12 @@ class IncidentPipeline:
             incident.stage = AgentStage.COMPLETED
             incident.end_time = datetime.utcnow()
             
-            # Calculate metrics
-            incident.metrics.detection_latency_seconds = 2.5  # Simulated
-            incident.metrics.time_to_mitigation_seconds = time.time() - detection_start
+            # Calculate final metrics (detection latency is simulated, time_to_mitigation already set in executor)
+            incident.metrics.detection_latency_seconds = 2.5  # Simulated (time from anomaly to detection)
+            # Don't recalculate time_to_mitigation - it was already set when mitigation was applied
+            if not incident.metrics.time_to_mitigation_seconds:
+                # Fallback if mitigation was never applied
+                incident.metrics.time_to_mitigation_seconds = time.time() - detection_start
             incident.metrics.mitigation_success = incident.metrics_recovered
             
             incident.add_timeline_event("completed", "Incident pipeline completed successfully")
@@ -212,12 +216,17 @@ class IncidentPipeline:
         apply_result = await self.executor.apply_mitigation(mitigation, incident.service_name)
         
         if apply_result["success"]:
+            # Calculate time to mitigation RIGHT NOW (when mitigation is applied)
+            mitigation_time = time.time() - context.get("detection_start", time.time())
+            incident.metrics.time_to_mitigation_seconds = mitigation_time
+            
             incident.applied_mitigation = mitigation
             incident.mitigation_approved = True
             incident.add_timeline_event("executor", "Mitigation applied successfully", {
-                "mitigation_type": mitigation.type.value
+                "mitigation_type": mitigation.type.value,
+                "time_to_mitigation": f"{mitigation_time:.1f}s"
             })
-            print(f"   ✅ Mitigation applied successfully")
+            print(f"   ✅ Mitigation applied successfully (time: {mitigation_time:.1f}s)")
         else:
             print(f"   ❌ Mitigation failed: {apply_result.get('message')}")
         
