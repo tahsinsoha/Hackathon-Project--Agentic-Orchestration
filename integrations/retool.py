@@ -19,6 +19,7 @@ class RetoolClient:
     def __init__(self, api_key: str = None, workspace_url: str = None):
         self.api_key = api_key or os.getenv("RETOOL_API_KEY", "")
         self.workspace_url = workspace_url or os.getenv("RETOOL_WORKSPACE_URL", "https://mycompany.retool.com")
+        self.webhook_url = os.getenv("RETOOL_WEBHOOK_URL", "")
         self.base_url = "https://api.retool.com/v1"
     
     def create_incident_dashboard(self, incident_data: Dict[str, Any]) -> str:
@@ -44,16 +45,73 @@ class RetoolClient:
         Returns:
             True if approval request was sent successfully
         """
+        # Prepare the payload
+        payload = {
+            "incident_id": incident_id,
+            "mitigation_type": mitigation.get('type', 'unknown'),
+            "description": mitigation.get('description', ''),
+            "risk_level": mitigation.get('risk_level', 'unknown'),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        # Try webhook URL first (easiest setup)
+        if self.webhook_url:
+            print("\n" + "="*70)
+            print("   ⚡ RETOOL WORKFLOW - Triggering via Webhook")
+            print("="*70)
+            print(f"   🎯 Incident ID: {incident_id}")
+            print(f"   📋 Mitigation Type: {mitigation.get('type', 'unknown')}")
+            print(f"   🔍 Risk Level: {mitigation.get('risk_level', 'unknown')}")
+            print(f"   🌐 Webhook: {self.webhook_url[:50]}...")
+            
+            try:
+                response = requests.post(
+                    self.webhook_url,
+                    json=payload,
+                    timeout=10
+                )
+                
+                if response.status_code in [200, 201, 202]:
+                    print(f"   ✅ Workflow triggered successfully!")
+                    print(f"   🎉 Check Retool Workflows dashboard for the run")
+                    print("="*70 + "\n")
+                    return True
+                else:
+                    print(f"   ⚠️  Webhook returned status {response.status_code}")
+                    print("="*70 + "\n")
+                    return False
+                    
+            except Exception as e:
+                print(f"   ❌ Webhook call failed: {e}")
+                print("="*70 + "\n")
+                return False
+        
+        # If no webhook, check for API key
         if not self.api_key:
-            print(f"   ℹ️ [RETOOL] No API key - simulating approval request for incident {incident_id}")
-            print(f"   📋 [RETOOL] Mitigation: {mitigation.get('type', 'unknown')}")
+            print("\n" + "="*70)
+            print("   ⚡ RETOOL INTEGRATION - Approval Workflow (Demo Mode)")
+            print("="*70)
+            print(f"   🎯 Incident ID: {incident_id}")
+            print(f"   📋 Mitigation Type: {mitigation.get('type', 'unknown')}")
+            print(f"   🔍 Risk Level: {mitigation.get('risk_level', 'unknown')}")
+            print(f"   ℹ️  Mode: Demo (set RETOOL_WEBHOOK_URL or RETOOL_API_KEY)")
+            print(f"   ✅ Approval request simulated - would trigger Retool Workflow")
+            print("="*70 + "\n")
             return True
         
-        print(f"   🔑 [RETOOL] API key detected, sending real approval request...")
+        # Use API key method
+        print("\n" + "="*70)
+        print("   ⚡ RETOOL WORKFLOW - Triggering via API")
+        print("="*70)
+        print(f"   🎯 Incident ID: {incident_id}")
+        print(f"   📋 Mitigation Type: {mitigation.get('type', 'unknown')}")
+        print(f"   🔍 Risk Level: {mitigation.get('risk_level', 'unknown')}")
+        print(f"   🔑 Using API Key authentication")
         
         try:
             # Real Retool Workflows API call
             workflow_url = f"{self.base_url}/workflows/trigger"
+            workflow_id = os.getenv("RETOOL_WORKFLOW_ID", "incident-approval")
             
             response = requests.post(
                 workflow_url,
@@ -62,28 +120,25 @@ class RetoolClient:
                     "Content-Type": "application/json"
                 },
                 json={
-                    "workflowId": os.getenv("RETOOL_WORKFLOW_ID", "incident-approval"),
-                    "data": {
-                        "incident_id": incident_id,
-                        "mitigation_type": mitigation.get('type', 'unknown'),
-                        "description": mitigation.get('description', ''),
-                        "risk_level": mitigation.get('risk_level', 'unknown'),
-                        "timestamp": datetime.utcnow().isoformat()
-                    }
+                    "workflowId": workflow_id,
+                    "data": payload
                 },
                 timeout=10
             )
             
             if response.status_code == 200:
-                print(f"   ✅ [RETOOL] Successfully sent approval request via REAL API to workflow!")
-                print(f"   🎯 [RETOOL] Incident {incident_id} approval logged in Retool")
+                print(f"   ✅ Workflow triggered successfully via API!")
+                print(f"   🎉 Check Retool Workflows dashboard for the run")
+                print("="*70 + "\n")
                 return True
             else:
-                print(f"   ⚠️ [RETOOL] API returned status {response.status_code}, using fallback")
+                print(f"   ⚠️  API returned status {response.status_code}")
+                print("="*70 + "\n")
                 return False
                 
         except Exception as e:
-            print(f"   ⚠️ [RETOOL] API call failed: {e}")
+            print(f"   ❌ API call failed: {e}")
+            print("="*70 + "\n")
             return False
     
     def log_incident_event(self, incident_id: str, event: Dict[str, Any]):

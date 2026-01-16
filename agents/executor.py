@@ -55,6 +55,7 @@ class ExecutorAgent(BaseAgent):
         
         # Send approval request to Retool if needed
         if mitigation.requires_approval:
+            print(f"\n   🔔 Mitigation requires approval - Calling Retool API...")
             mitigation_dict = {
                 "type": mitigation.type.value,
                 "description": mitigation.description,
@@ -62,7 +63,8 @@ class ExecutorAgent(BaseAgent):
                 "risk_level": mitigation.risk_level
             }
             approval_sent = self.retool.send_approval_request(incident.id, mitigation_dict)
-            print(f"   📋 Retool approval request sent: {approval_sent}")
+            if approval_sent:
+                print(f"   ✅ Retool approval workflow triggered successfully!")
         
         # Generate incident visualization with Freepik
         incident_data = {

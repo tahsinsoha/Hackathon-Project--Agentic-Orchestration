@@ -80,6 +80,69 @@
             color: #999;
         }
         
+        .retool-banner {
+            background: linear-gradient(135deg, #667eea 0%, #5865F2 100%);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .retool-banner:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(88, 101, 242, 0.3);
+        }
+        
+        .retool-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .retool-logo {
+            font-size: 2rem;
+        }
+        
+        .retool-text h3 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+        
+        .retool-text p {
+            margin: 5px 0 0 0;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .retool-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .retool-btn {
+            background: white;
+            color: #667eea;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .retool-btn:hover {
+            background: #f0f0f0;
+            transform: scale(1.05);
+        }
+        
         .main-content {
             display: grid;
             grid-template-columns: 2fr 1fr;
@@ -285,9 +348,38 @@
 <body>
     <div class="container">
         <header>
-            <h1>🚨 Incident Autopilot</h1>
-            <p class="subtitle">Multi-Agent Incident Response with Guardrails</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <div>
+                    <h1>🚨 Incident Autopilot</h1>
+                    <p class="subtitle">Multi-Agent Incident Response with Guardrails</p>
+                </div>
+                <div style="text-align: right;">
+                    <div style="background: linear-gradient(135deg, #3D3B4A 0%, #5865F2 100%); color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 8px; font-size: 14px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                        ⚡ Powered by Retool
+                    </div>
+                    <a href="dashboard/retool_dashboard.json" download style="display: inline-block; background: #667eea; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; margin-right: 8px;">
+                        📦 Download Retool Config
+                    </a>
+                    <a href="https://retool.com" target="_blank" style="display: inline-block; background: #5865F2; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px;">
+                        🚀 Open in Retool
+                    </a>
+                </div>
+            </div>
         </header>
+        
+        <div class="retool-banner" onclick="window.open('https://retool.com', '_blank')">
+            <div class="retool-info">
+                <div class="retool-logo">⚡</div>
+                <div class="retool-text">
+                    <h3>Retool Integration Active</h3>
+                    <p>Approval workflows • Enterprise UI • Real-time monitoring</p>
+                </div>
+            </div>
+            <div class="retool-actions">
+                <a href="dashboard/retool_dashboard.json" download class="retool-btn" onclick="event.stopPropagation()">📦 Download Config</a>
+                <button class="retool-btn" onclick="event.stopPropagation(); showRetoolInfo()">ℹ️ Learn More</button>
+            </div>
+        </div>
         
         <div class="stats-grid" id="stats">
             <div class="stat-card">
@@ -356,6 +448,28 @@
     
     <script>
         let selectedIncident = null;
+        
+        // Show Retool integration info
+        function showRetoolInfo() {
+            alert(`🎯 Retool Integration Details:
+
+✅ Approval Workflows: When agents propose mitigations, approval requests are sent to Retool
+✅ Enterprise Dashboard: Full dashboard configuration available (retool_dashboard.json)
+✅ Real-time API: This dashboard connects to the same API that Retool uses
+
+📦 To use the Retool dashboard:
+1. Sign up at retool.com (free)
+2. Import dashboard/retool_dashboard.json
+3. Configure API URL
+4. Start using!
+
+🔧 Integration Points:
+• agents/executor.py - Calls Retool API for approvals
+• integrations/retool.py - Full Retool client implementation
+• API endpoints - Same data available to Retool
+
+Check the console output when running incidents to see Retool API calls!`);
+        }
         
         // Load statistics
         async function loadStatistics() {
