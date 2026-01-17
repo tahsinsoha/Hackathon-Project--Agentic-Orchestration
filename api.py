@@ -238,6 +238,121 @@ async def import_to_retool():
     return response
 
 
+@app.post("/api/demo/tonic-retool")
+async def demo_tonic_retool(incident_type: Optional[str] = None):
+    """Run Tonic → Retool demo without OpenAI.
+    
+    Args:
+        incident_type: Type of incident (latency_spike, error_rate, etc.)
+    
+    Returns:
+        Demo results with Tonic data and Retool trigger status
+    """
+    from integrations.tonic import TonicClient
+    from integrations.retool import RetoolClient
+    from datetime import datetime
+    
+    try:
+        # Initialize clients
+        tonic = TonicClient()
+        retool = RetoolClient()
+        
+        # Generate incident with Tonic data
+        incident, current_metrics, baseline_metrics = simulator.generate_incident(incident_type)
+        
+        # Store the incident
+        incident_store.create_incident(incident)
+        
+        # Generate time-series data from Tonic
+        metrics_data = tonic.generate_metrics_dataset(
+            incident_type or "latency_spike",
+            duration_minutes=5
+        )
+        
+        # Generate log samples
+        logs = tonic.generate_log_entries(incident_type or "latency_spike", count=5)
+        
+        # Create mitigation plan
+        mitigation_plans = {
+            "latency_spike": {
+                "type": "rollback",
+                "description": "Roll back to previous stable version v1.2.2",
+                "risk_level": "medium",
+                "parameters": {"target_version": "v1.2.2"}
+            },
+            "error_rate": {
+                "type": "scale_up",
+                "description": "Scale up service replicas from 3 to 6",
+                "risk_level": "low",
+                "parameters": {"current_replicas": 3, "target_replicas": 6}
+            },
+            "resource_saturation": {
+                "type": "increase_resources",
+                "description": "Increase CPU limit from 2 cores to 4 cores",
+                "risk_level": "low",
+                "parameters": {"resource": "cpu", "from": "2", "to": "4"}
+            },
+            "queue_depth": {
+                "type": "scale_consumers",
+                "description": "Scale up queue consumers from 2 to 8",
+                "risk_level": "medium",
+                "parameters": {"current": 2, "target": 8}
+            }
+        }
+        
+        mitigation = mitigation_plans.get(
+            incident_type or "latency_spike",
+            mitigation_plans["latency_spike"]
+        )
+        
+        # Trigger Retool workflow
+        retool_success = retool.send_approval_request(incident.id, mitigation)
+        
+        # Calculate metrics changes
+        metrics_comparison = []
+        for key in ['latency_p99', 'error_rate', 'cpu_usage', 'memory_usage']:
+            current = current_metrics.get(key, 0)
+            baseline = baseline_metrics.get(key, 0)
+            if baseline > 0:
+                change_pct = ((current - baseline) / baseline * 100)
+                metrics_comparison.append({
+                    "metric": key,
+                    "current": round(current, 2),
+                    "baseline": round(baseline, 2),
+                    "change_percent": round(change_pct, 1),
+                    "status": "critical" if abs(change_pct) > 50 else "warning" if abs(change_pct) > 20 else "normal"
+                })
+        
+        # Return comprehensive results
+        return {
+            "success": True,
+            "incident": {
+                "id": incident.id,
+                "service": incident.service_name,
+                "severity": incident.severity.value,
+                "timestamp": incident.start_time.isoformat()
+            },
+            "tonic": {
+                "status": "success",
+                "metrics_generated": len(metrics_data),
+                "logs_generated": len(logs),
+                "sample_logs": logs[:3],
+                "latest_metrics": metrics_data[-1] if metrics_data else {}
+            },
+            "metrics_comparison": metrics_comparison,
+            "mitigation": mitigation,
+            "retool": {
+                "triggered": retool_success,
+                "status": "success" if retool_success else "demo_mode",
+                "message": "Workflow triggered successfully" if retool_success else "Demo mode (configure RETOOL_WEBHOOK_URL)"
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Demo failed: {str(e)}")
+
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("INCIDENT_AUTOPILOT_PORT", 8000))

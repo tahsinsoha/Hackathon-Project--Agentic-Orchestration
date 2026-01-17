@@ -80,69 +80,6 @@
             color: #999;
         }
         
-        .retool-banner {
-            background: linear-gradient(135deg, #667eea 0%, #5865F2 100%);
-            color: white;
-            padding: 15px 25px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-        
-        .retool-banner:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(88, 101, 242, 0.3);
-        }
-        
-        .retool-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        
-        .retool-logo {
-            font-size: 2rem;
-        }
-        
-        .retool-text h3 {
-            margin: 0;
-            font-size: 1.2rem;
-        }
-        
-        .retool-text p {
-            margin: 5px 0 0 0;
-            font-size: 0.9rem;
-            opacity: 0.9;
-        }
-        
-        .retool-actions {
-            display: flex;
-            gap: 10px;
-        }
-        
-        .retool-btn {
-            background: white;
-            color: #667eea;
-            padding: 8px 16px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: bold;
-            font-size: 0.9rem;
-            transition: all 0.2s;
-            border: none;
-            cursor: pointer;
-        }
-        
-        .retool-btn:hover {
-            background: #f0f0f0;
-            transform: scale(1.05);
-        }
-        
         /* Import Modal Styles */
         .modal {
             display: none;
@@ -474,33 +411,8 @@
                     <h1>🚨 Incident Autopilot</h1>
                     <p class="subtitle">Multi-Agent Incident Response with Guardrails</p>
                 </div>
-                <div style="text-align: right;">
-                    <div style="background: linear-gradient(135deg, #3D3B4A 0%, #5865F2 100%); color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 8px; font-size: 14px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-                        ⚡ Powered by Retool
-                    </div>
-                    <a href="dashboard/retool_dashboard.json" download style="display: inline-block; background: #667eea; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; margin-right: 8px;">
-                        📦 Download Retool Config
-                    </a>
-                    <button onclick="openRetoolImportGuide()" style="display: inline-block; background: #5865F2; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; border: none; cursor: pointer; font-weight: bold;">
-                        🚀 Open in Retool
-                    </button>
-                </div>
             </div>
         </header>
-        
-        <div class="retool-banner" onclick="window.open('https://retool.com', '_blank')">
-            <div class="retool-info">
-                <div class="retool-logo">⚡</div>
-                <div class="retool-text">
-                    <h3>Retool Integration Active</h3>
-                    <p>Approval workflows • Enterprise UI • Real-time monitoring</p>
-                </div>
-            </div>
-            <div class="retool-actions">
-                <button class="retool-btn" onclick="event.stopPropagation(); openRetoolImportGuide()">🚀 Import to Retool</button>
-                <button class="retool-btn" onclick="event.stopPropagation(); showRetoolInfo()">ℹ️ Learn More</button>
-            </div>
-        </div>
         
         <div class="stats-grid" id="stats">
             <div class="stat-card">
@@ -545,9 +457,22 @@
                             <option value="queue_depth">Queue Depth</option>
                         </select>
                         <button class="button" onclick="simulateIncident()">🚀 Simulate Incident</button>
+                        <button class="button button-tonic" onclick="runTonicRetoolDemo()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                            🧪 Tonic Demo
+                        </button>
                         <button class="button button-secondary" onclick="refreshData()">🔄 Refresh</button>
                     </div>
                 </div>
+                
+                <!-- Tonic Demo Results Panel -->
+                <div id="demo-results" style="display: none; margin-top: 15px; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0; color: #667eea;">🧪 Demo Results</h3>
+                        <button onclick="document.getElementById('demo-results').style.display='none'" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #999;">×</button>
+                    </div>
+                    <div id="demo-content"></div>
+                </div>
+                
                 <div class="incident-list" id="incident-list">
                     <div class="loading">
                         <div class="spinner"></div>
@@ -569,28 +494,6 @@
     
     <script>
         let selectedIncident = null;
-        
-        // Show Retool integration info
-        function showRetoolInfo() {
-            alert(`🎯 Retool Integration Details:
-
-✅ Approval Workflows: When agents propose mitigations, approval requests are sent to Retool
-✅ Enterprise Dashboard: Full dashboard configuration available (retool_dashboard.json)
-✅ Real-time API: This dashboard connects to the same API that Retool uses
-
-📦 To use the Retool dashboard:
-1. Sign up at retool.com (free)
-2. Import dashboard/retool_dashboard.json
-3. Configure API URL
-4. Start using!
-
-🔧 Integration Points:
-• agents/executor.py - Calls Retool API for approvals
-• integrations/retool.py - Full Retool client implementation
-• API endpoints - Same data available to Retool
-
-Check the console output when running incidents to see Retool API calls!`);
-        }
         
         // Load statistics
         async function loadStatistics() {
@@ -714,6 +617,159 @@ Check the console output when running incidents to see Retool API calls!`);
             }
         }
         
+        // Run Tonic → Retool Demo
+        async function runTonicRetoolDemo() {
+            const type = document.getElementById('incident-type').value;
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '⏳ Running Demo...';
+            
+            const demoPanel = document.getElementById('demo-results');
+            const demoContent = document.getElementById('demo-content');
+            
+            // Show loading
+            demoPanel.style.display = 'block';
+            demoContent.innerHTML = '<div style="text-align: center; padding: 20px;"><div class="spinner"></div><p>Generating Tonic synthetic data and processing...</p></div>';
+            
+            try {
+                const url = type ? `/api/demo/tonic-retool?incident_type=${type}` : '/api/demo/tonic-retool';
+                const response = await fetch(url, { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Format the results beautifully
+                    demoContent.innerHTML = `
+                        <div style="display: grid; gap: 20px;">
+                            <!-- Incident Info -->
+                            <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <h4 style="margin: 0 0 10px 0; color: #667eea;">📋 Incident Generated</h4>
+                                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 0.9rem;">
+                                    <div><strong>ID:</strong> ${data.incident.id}</div>
+                                    <div><strong>Service:</strong> ${data.incident.service}</div>
+                                    <div><strong>Severity:</strong> <span class="badge badge-${data.incident.severity}">${data.incident.severity}</span></div>
+                                    <div><strong>Time:</strong> ${new Date(data.incident.timestamp).toLocaleTimeString()}</div>
+                                </div>
+                            </div>
+                            
+                            <!-- Tonic Status -->
+                            <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <h4 style="margin: 0 0 10px 0; color: #667eea;">🧪 Tonic Synthetic Data</h4>
+                                <div style="font-size: 0.9rem;">
+                                    <div style="margin-bottom: 8px;">✅ Status: ${data.tonic.status}</div>
+                                    <div style="margin-bottom: 8px;">📊 Metrics Generated: ${data.tonic.metrics_generated} data points</div>
+                                    <div style="margin-bottom: 8px;">📝 Logs Generated: ${data.tonic.logs_generated} entries</div>
+                                    ${data.tonic.sample_logs && data.tonic.sample_logs.length > 0 ? `
+                                    <div style="margin-top: 10px;">
+                                        <strong>Sample Logs:</strong>
+                                        <div style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin-top: 5px; font-family: monospace; font-size: 0.85rem;">
+                                            ${data.tonic.sample_logs.map(log => `<div style="margin: 2px 0;">${log}</div>`).join('')}
+                                        </div>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            
+                            <!-- Metrics Comparison -->
+                            <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <h4 style="margin: 0 0 10px 0; color: #667eea;">📊 Metrics Comparison</h4>
+                                <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                                    <thead>
+                                        <tr style="border-bottom: 2px solid #e0e0e0;">
+                                            <th style="text-align: left; padding: 8px;">Metric</th>
+                                            <th style="text-align: right; padding: 8px;">Current</th>
+                                            <th style="text-align: right; padding: 8px;">Baseline</th>
+                                            <th style="text-align: right; padding: 8px;">Change</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${data.metrics_comparison.map(m => `
+                                            <tr style="border-bottom: 1px solid #f0f0f0;">
+                                                <td style="padding: 8px;">${m.metric}</td>
+                                                <td style="text-align: right; padding: 8px;">${m.current}</td>
+                                                <td style="text-align: right; padding: 8px;">${m.baseline}</td>
+                                                <td style="text-align: right; padding: 8px;">
+                                                    <span style="color: ${m.status === 'critical' ? '#c00' : m.status === 'warning' ? '#f60' : '#0a0'};">
+                                                        ${m.change_percent > 0 ? '+' : ''}${m.change_percent}%
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Mitigation Plan -->
+                            <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <h4 style="margin: 0 0 10px 0; color: #667eea;">🔧 Mitigation Plan</h4>
+                                <div style="font-size: 0.9rem;">
+                                    <div style="margin-bottom: 8px;"><strong>Type:</strong> ${data.mitigation.type}</div>
+                                    <div style="margin-bottom: 8px;"><strong>Risk Level:</strong> <span class="badge badge-${data.mitigation.risk_level}">${data.mitigation.risk_level}</span></div>
+                                    <div style="margin-bottom: 8px;"><strong>Description:</strong> ${data.mitigation.description}</div>
+                                </div>
+                            </div>
+                            
+                            <!-- Workflow Status -->
+                            <div style="background: ${data.retool.triggered ? 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)' : '#fff3e0'}; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 4px solid ${data.retool.triggered ? '#4caf50' : '#ff9800'};">
+                                <h4 style="margin: 0 0 10px 0; color: ${data.retool.triggered ? '#2e7d32' : '#e65100'};">⚡ Workflow Status</h4>
+                                <div style="font-size: 0.9rem;">
+                                    <div style="margin-bottom: 8px;">
+                                        ${data.retool.triggered ? '✅ <strong>Workflow Triggered Successfully!</strong>' : '⚠️  <strong>Demo Mode</strong>'}
+                                    </div>
+                                    <div style="margin-bottom: 8px;">${data.retool.message}</div>
+                                    ${data.retool.triggered ? `
+                                    <div style="margin-top: 10px; padding: 10px; background: rgba(255,255,255,0.7); border-radius: 4px;">
+                                        <strong>✓ Workflow executed:</strong> Incident ID: <code style="background: white; padding: 2px 6px; border-radius: 3px;">${data.incident.id}</code>
+                                    </div>
+                                    ` : `
+                                    <div style="margin-top: 10px; padding: 10px; background: rgba(255,255,255,0.7); border-radius: 4px;">
+                                        <strong>💡 To enable:</strong> Configure webhook in .env file
+                                    </div>
+                                    `}
+                                </div>
+                            </div>
+                            
+                            <!-- Summary -->
+                            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 8px;">
+                                <h4 style="margin: 0 0 10px 0;">🎉 Demo Complete!</h4>
+                                <div style="font-size: 0.9rem;">
+                                    <div>✅ Tonic generated synthetic incident data</div>
+                                    <div>✅ Metrics comparison calculated</div>
+                                    <div>✅ Mitigation plan created</div>
+                                    <div>✅ Workflow ${data.retool.triggered ? 'triggered' : 'simulated'}</div>
+                                    <div style="margin-top: 10px; opacity: 0.9;">
+                                        <em>No OpenAI API key needed for this demo!</em>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Refresh the incident list
+                    await loadIncidents();
+                    await loadStatistics();
+                } else {
+                    demoContent.innerHTML = `
+                        <div style="background: #ffebee; color: #c62828; padding: 15px; border-radius: 8px;">
+                            <strong>❌ Demo Failed</strong>
+                            <p>Something went wrong. Check the console for details.</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Demo failed:', error);
+                demoContent.innerHTML = `
+                    <div style="background: #ffebee; color: #c62828; padding: 15px; border-radius: 8px;">
+                        <strong>❌ Error</strong>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            } finally {
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }
+        }
+        
         // Refresh all data
         async function refreshData() {
             await loadStatistics();
@@ -732,103 +788,7 @@ Check the console output when running incidents to see Retool API calls!`);
         
         // Auto-refresh every 5 seconds
         setInterval(refreshData, 5000);
-        
-        // Open Retool Import Guide
-        async function openRetoolImportGuide() {
-            // Show modal
-            document.getElementById('retoolImportModal').style.display = 'block';
-            
-            // Auto-download the config file
-            const link = document.createElement('a');
-            link.href = 'dashboard/retool_dashboard.json';
-            link.download = 'incident-autopilot-retool-dashboard.json';
-            link.click();
-            
-            // Show success message
-            setTimeout(() => {
-                const downloadMsg = document.getElementById('downloadStatus');
-                downloadMsg.style.display = 'block';
-                downloadMsg.innerHTML = '✅ Config file downloaded! Follow the steps below.';
-            }, 500);
-        }
-        
-        function closeModal() {
-            document.getElementById('retoolImportModal').style.display = 'none';
-        }
-        
-        function openRetoolInNewTab() {
-            window.open('https://retool.com/apps', '_blank');
-            setTimeout(() => {
-                alert('📋 Steps to import:\n\n1. In Retool, click "Create new" button\n2. Select "From JSON/YAML"\n3. Upload the downloaded JSON file\n4. Update API URL to: ' + window.location.origin + '/api\n5. Click Release!\n\nThe JSON file was already downloaded for you.');
-            }, 1000);
-        }
-        
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('retoolImportModal');
-            if (event.target == modal) {
-                closeModal();
-            }
-        }
     </script>
-    
-    <!-- Retool Import Modal -->
-    <div id="retoolImportModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title">🚀 Import to Retool</h2>
-                <button class="close-btn" onclick="closeModal()">&times;</button>
-            </div>
-            
-            <div id="downloadStatus" style="display:none; background: #e8f5e9; color: #2e7d32; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold;"></div>
-            
-            <div class="import-steps">
-                <div class="import-step">
-                    <h4>Step 1: Download Config ✅</h4>
-                    <p>The <code>incident-autopilot-retool-dashboard.json</code> file has been downloaded automatically!</p>
-                </div>
-                
-                <div class="import-step">
-                    <h4>Step 2: Go to Retool</h4>
-                    <p>Click the button below to open Retool in a new tab. Sign up for free if you don't have an account.</p>
-                </div>
-                
-                <div class="import-step">
-                    <h4>Step 3: Create New App</h4>
-                    <p>In Retool, click <strong>"Create new"</strong> → <strong>"From JSON/YAML"</strong></p>
-                </div>
-                
-                <div class="import-step">
-                    <h4>Step 4: Upload JSON</h4>
-                    <p>Upload the downloaded <code>incident-autopilot-retool-dashboard.json</code> file</p>
-                </div>
-                
-                <div class="import-step">
-                    <h4>Step 5: Configure API</h4>
-                    <p>Update the API Resource base URL to: <code id="apiUrl"></code></p>
-                    <script>document.getElementById('apiUrl').textContent = window.location.origin + '/api';</script>
-                </div>
-                
-                <div class="import-step">
-                    <h4>Step 6: Release & Use! 🎉</h4>
-                    <p>Click <strong>"Release"</strong> and your dashboard is live!</p>
-                </div>
-            </div>
-            
-            <div class="action-buttons">
-                <button class="big-button big-button-primary" onclick="window.open('dashboard/retool_dashboard.json', '_blank')">
-                    📦 Download Again
-                </button>
-                <button class="big-button big-button-secondary" onclick="openRetoolInNewTab()">
-                    🚀 Open Retool Now
-                </button>
-            </div>
-            
-            <p style="text-align: center; margin-top: 20px; color: #999; font-size: 0.9rem;">
-                Need help? See <a href="dashboard/RETOOL_SETUP.md" target="_blank" style="color: #667eea;">detailed setup guide</a>
-            </p>
-        </div>
-    </div>
 </body>
 </html>
 
