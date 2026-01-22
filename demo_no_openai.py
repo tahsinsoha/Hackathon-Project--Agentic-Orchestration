@@ -168,13 +168,8 @@ def main():
         print()
         print("You should see the incident data and mitigation plan!")
     elif success:
-        print("✅ Demo completed (Demo mode - no Retool configured)")
-        print()
-        print("To see real Retool integration:")
-        print("  1. Create workflow at https://retool.com")
-        print("  2. Get webhook URL")
-        print("  3. Add to .env: RETOOL_WEBHOOK_URL=your_url")
-        print("  4. Run this demo again!")
+        print("Success")
+
     
     print(f"\n{'='*70}")
     print("\n🎉 What You Just Saw:")

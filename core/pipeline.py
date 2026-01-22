@@ -129,6 +129,7 @@ class IncidentPipeline:
         result = await self.triage.execute(context)
         incident.incident_type = result["incident_type"]
         context["incident_type"] = result["incident_type"]
+        context["reasoning"] = result["reasoning"]
         
         # Store triage accuracy (in real scenario, compare against ground truth)
         incident.metrics.triage_accuracy = result["confidence"]

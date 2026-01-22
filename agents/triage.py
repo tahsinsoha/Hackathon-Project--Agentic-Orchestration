@@ -1,167 +1,273 @@
-"""Triage Agent: Classifies incident type."""
+"""Triage Agent: Classifies incident type using Google Gemini + Runbooks."""
 import json
-import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+
 from .base import BaseAgent
 from core.models import IncidentType, Evidence
 
 
 class TriageAgent(BaseAgent):
-    """Triage agent classifies incident type and determines severity."""
-    
+    """Triage agent classifies incident type using Google Gemini AI (with runbook context)."""
+
     def __init__(self):
-        super().__init__("Triage")
-    
+        super().__init__("Triage", model="gemini-2.0-flash")
+
     async def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Classify the incident type based on evidence."""
+        """Classify the incident type based on evidence + runbooks."""
         evidence: Evidence = context.get("evidence")
-        incident = context.get("incident")
-        
-        # Build context for LLM
-        system_prompt = """You are an expert SRE triaging incidents. Classify the incident type based on the evidence.
+        # runbooks were added by Scout: context["runbooks"] = {...}
+        runbooks: Dict[str, Any] = context.get("runbooks", {}) or {}
 
-Possible types:
-- latency_spike: High p95/p99 latency
-- error_rate_increase: Increased error percentage
-- resource_saturation: CPU/memory exhaustion
-- queue_depth_growth: Message queue backlog growing
+        classification = await self._classify_incident(evidence, runbooks, context)
 
-Provide your classification and confidence level."""
-
-        user_message = f"""Incident: {incident.service_name}
-
-Metrics:
-- Latency p95: {evidence.metrics.get('latency_p95')}ms
-- Latency p99: {evidence.metrics.get('latency_p99')}ms  
-- Error rate: {evidence.metrics.get('error_rate')}%
-- CPU usage: {evidence.metrics.get('cpu_usage')}%
-- Memory usage: {evidence.metrics.get('memory_usage')}%
-- Queue depth: {evidence.metrics.get('queue_depth')}
-
-Recent logs:
-{chr(10).join(evidence.logs[:5])}
-
-Recent deployments:
-{json.dumps(evidence.recent_deploys, indent=2)}
-
-Classify this incident."""
-
-        # Get LLM classification (or use rule-based fallback)
-        classification = await self._classify_incident(evidence)
-        
         return {
             "incident_type": classification["type"],
             "confidence": classification["confidence"],
-            "reasoning": classification["reasoning"]
+            "reasoning": classification["reasoning"],
         }
-    
-    async def _classify_incident(self, evidence: Evidence) -> Dict[str, Any]:
-        """Classify incident using Anthropic Claude or fallback to rules."""
-        
-        # Try Anthropic Claude first if API key is available
-        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-        if anthropic_key:
-            print(f"   🔑 [TRIAGE] Anthropic API key detected, attempting AI classification...")
-            try:
-                result = await self._classify_with_anthropic(evidence, anthropic_key)
-                print(f"   ✅ [TRIAGE] Using Anthropic Claude AI for classification")
-                return result
-            except Exception as e:
-                print(f"   ⚠️ [TRIAGE] Anthropic API failed, using rule-based fallback: {e}")
-        else:
-            print(f"   ℹ️ [TRIAGE] No Anthropic API key found, using rule-based classification")
-        
-        # Fallback to rule-based classification
-        return self._classify_with_rules(evidence)
-    
-    async def _classify_with_anthropic(self, evidence: Evidence, api_key: str) -> Dict[str, Any]:
-        """Use Anthropic Claude for classification."""
-        from anthropic import Anthropic
-        
-        client = Anthropic(api_key=api_key)
-        metrics = evidence.metrics
-        
-        prompt = f"""You are an expert SRE triaging a production incident. Classify the incident type.
 
-Metrics:
+    async def _classify_incident(
+        self,
+        evidence: Evidence,
+        runbooks: Dict[str, Any],
+        context: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Classify incident using Google Gemini or fallback to rules."""
+        if self.ai_client:
+            print("   🔑 [TRIAGE] Google Gemini API available, attempting AI classification...")
+            try:
+                result = await self._classify_with_gemini(evidence, runbooks, context)
+                if result:
+                    print("   ✅ [TRIAGE] Using Google Gemini AI for classification")
+                    return result
+                print("   ⚠️  [TRIAGE] Gemini returned empty result, using fallback")
+            except Exception as e:
+                print(f"   ⚠️  [TRIAGE] Gemini API failed: {e}, using rule-based fallback")
+        else:
+            print("   ℹ️  [TRIAGE] No AI client available, using rule-based classification")
+
+        return self._classify_with_rules(evidence, runbooks, context)
+
+    def _format_runbook_context(
+        self,
+        runbooks: Dict[str, Any],
+        max_chars: int = 1200
+    ) -> str:
+        """
+        Convert runbook dict into a short, prompt-friendly snippet.
+        Scout's DocumentFetcher returns:
+          { "<incident_type>": "<summary>", "source": "...", "full_content": "..." }
+
+        We will prefer 'full_content' (if present) but trim it.
+        """
+        if not runbooks:
+            return "No runbook content available."
+
+        source = runbooks.get("source", "Unknown")
+        # Try to include whichever section looks like the runbook body
+        # Exclude metadata keys
+        sections = []
+        for k, v in runbooks.items():
+            if k in ("source",):
+                continue
+            if k == "full_content":
+                continue
+            # k is typically incident_type (latency_spike / etc.)
+            if isinstance(v, str) and v.strip():
+                sections.append((k, v.strip()))
+
+        # Prefer a per-incident section if present; else use whatever exists
+        body = ""
+        if sections:
+            # join all sections (usually one)
+            parts = [f"[{k}]\n{txt}" for k, txt in sections]
+            body = "\n\n".join(parts)
+
+        # If we have full_content, add a trimmed chunk (often richer)
+        full_content = runbooks.get("full_content")
+        if isinstance(full_content, str) and full_content.strip():
+            fc = full_content.strip()
+            if len(fc) > max_chars:
+                fc = fc[:max_chars] + "..."
+            if body:
+                body = body + "\n\n[full_content]\n" + fc
+            else:
+                body = fc
+
+        if not body:
+            return f"Runbook source: {source} (no readable content found)."
+
+        # Final trim to avoid huge prompts
+        if len(body) > max_chars:
+            body = body[:max_chars] + "..."
+
+        return f"Runbook source: {source}\n\n{body}"
+
+    async def _classify_with_gemini(
+        self,
+        evidence: Evidence,
+        runbooks: Dict[str, Any],
+        context: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Use Google Gemini for classification, including runbook guidance."""
+        metrics = evidence.metrics
+        baseline = context.get("baseline_metrics", {})
+
+        runbook_snippet = self._format_runbook_context(runbooks, max_chars=1200)
+
+        prompt = f"""You are an expert Site Reliability Engineer (SRE) analyzing a production incident.
+Your task is to classify the incident type based on all available evidence.
+
+CURRENT METRICS:
+- Latency p95: {metrics.get('latency_p95')}ms
 - Latency p99: {metrics.get('latency_p99')}ms
 - Error rate: {metrics.get('error_rate')}%
 - CPU usage: {metrics.get('cpu_usage')}%
 - Memory usage: {metrics.get('memory_usage')}%
+- Request rate: {metrics.get('request_rate')} req/s
 - Queue depth: {metrics.get('queue_depth')}
 
-Recent logs:
-{chr(10).join(evidence.logs[:3])}
+BASELINE METRICS (normal operating state):
+- Latency p99: {baseline.get('latency_p99', 'unknown')}ms
+- Error rate: {baseline.get('error_rate', 'unknown')}%
+- CPU usage: {baseline.get('cpu_usage', 'unknown')}%
+- Queue depth: {baseline.get('queue_depth', 'unknown')}
 
-Classify as ONE of:
-- latency_spike: High p95/p99 latency
-- error_rate_increase: Increased error percentage  
-- resource_saturation: CPU/memory exhaustion
-- queue_depth_growth: Message queue backlog
+RECENT ERROR LOGS:
+{chr(10).join(evidence.logs[:8])}
 
-Respond in JSON format:
-{{"type": "latency_spike", "confidence": 0.9, "reasoning": "explanation"}}"""
+RECENT DEPLOYMENTS:
+{json.dumps(evidence.recent_deploys, indent=2)}
 
-        message = client.messages.create(
-            model="claude-3-opus-20240229",  # Use Claude 3 Opus (most reliable)
-            max_tokens=500,
-            messages=[{"role": "user", "content": prompt}]
+SERVICE DEPENDENCIES:
+{', '.join(evidence.dependencies) if evidence.dependencies else 'None listed'}
+
+RUNBOOK GUIDANCE (may help identify patterns / symptoms):
+{runbook_snippet}
+
+ANALYSIS INSTRUCTIONS:
+1. Compare current metrics to baseline to identify anomalies
+2. Use logs to identify the dominant failure symptom (timeouts, 5xx, saturation, queue backlog)
+3. Consider deployment timing vs incident onset
+4. Use runbook symptom patterns as supporting evidence (not as the only signal)
+
+CLASSIFICATION OPTIONS - Choose exactly ONE:
+- latency_spike: Significantly high p95/p99 latency (typically >2x baseline)
+- error_rate_increase: Elevated error percentage (typically >2x baseline)
+- resource_saturation: CPU or memory exhaustion (typically >85%)
+- queue_depth_growth: Message queue backlog growing rapidly (typically >2x baseline)
+
+RESPONSE FORMAT:
+Respond ONLY with a valid JSON object in this exact format (no markdown, no extra text):
+
+{{"type": "latency_spike", "confidence": 0.92, "reasoning": "Detailed explanation based on evidence"}}
+"""
+
+        result = self.ai_client.generate_json(
+            prompt=prompt,
+            temperature=0.3,
+            max_tokens=1000,
         )
-        
-        # Parse Claude's response
-        response_text = message.content[0].text
-        import json
-        result = json.loads(response_text)
-        
-        # Map type string to enum
+
+        if not result:
+            return None
+
+        if "type" not in result or "confidence" not in result or "reasoning" not in result:
+            print(f"   ⚠️  [TRIAGE] Missing required fields in Gemini response: {result}")
+            return None
+
         type_map = {
             "latency_spike": IncidentType.LATENCY_SPIKE,
             "error_rate_increase": IncidentType.ERROR_RATE,
             "resource_saturation": IncidentType.RESOURCE_SATURATION,
-            "queue_depth_growth": IncidentType.QUEUE_DEPTH
+            "queue_depth_growth": IncidentType.QUEUE_DEPTH,
         }
-        
+
+        incident_type = type_map.get(result["type"], IncidentType.UNKNOWN)
+        if incident_type == IncidentType.UNKNOWN:
+            print(f"   ⚠️  [TRIAGE] Unknown incident type from Gemini: {result['type']}")
+
         return {
-            "type": type_map.get(result["type"], IncidentType.UNKNOWN),
-            "confidence": result["confidence"],
-            "reasoning": result["reasoning"]
+            "type": incident_type,
+            "confidence": float(result["confidence"]),
+            "reasoning": result["reasoning"],
         }
-    
-    def _classify_with_rules(self, evidence: Evidence) -> Dict[str, Any]:
-        """Rule-based classification fallback."""
+
+    def _classify_with_rules(
+        self,
+        evidence: Evidence,
+        runbooks: Dict[str, Any],
+        context: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Rule-based classification fallback with baseline comparison + runbook mention."""
         metrics = evidence.metrics
-        
-        if metrics.get("latency_p99", 0) > 1000:  # >1s
+        baseline = context.get("baseline_metrics", {})
+
+        current_latency = metrics.get("latency_p99", 0)
+        baseline_latency = baseline.get("latency_p99", 500)
+
+        current_error = metrics.get("error_rate", 0)
+        baseline_error = baseline.get("error_rate", 0.5)
+
+        current_cpu = metrics.get("cpu_usage", 0)
+        current_memory = metrics.get("memory_usage", 0)
+
+        current_queue = metrics.get("queue_depth", 0)
+        baseline_queue = baseline.get("queue_depth", 100)
+
+        # Quick runbook reference for reasoning (not used for decision)
+        rb_source = (runbooks or {}).get("source", "none")
+
+        if current_latency > max(baseline_latency * 2, 1000):
+            increase_pct = ((current_latency - baseline_latency) / baseline_latency * 100) if baseline_latency > 0 else 0
             return {
                 "type": IncidentType.LATENCY_SPIKE,
                 "confidence": 0.9,
-                "reasoning": "P99 latency significantly elevated above baseline"
+                "reasoning": (
+                    f"P99 latency elevated to {current_latency}ms (baseline: {baseline_latency}ms, +{increase_pct:.0f}%). "
+                    f"Runbook source: {rb_source}."
+                )
             }
-        
-        if metrics.get("error_rate", 0) > 5.0:  # >5%
+
+        if current_error > max(baseline_error * 2, 5.0):
+            increase_pct = ((current_error - baseline_error) / baseline_error * 100) if baseline_error > 0 else 0
             return {
                 "type": IncidentType.ERROR_RATE,
                 "confidence": 0.95,
-                "reasoning": "Error rate exceeds acceptable threshold"
+                "reasoning": (
+                    f"Error rate elevated to {current_error}% (baseline: {baseline_error}%, +{increase_pct:.0f}%). "
+                    f"Runbook source: {rb_source}."
+                )
             }
-        
-        if metrics.get("cpu_usage", 0) > 85 or metrics.get("memory_usage", 0) > 85:
+
+        if current_cpu > 85 or current_memory > 85:
+            resource_type = "CPU" if current_cpu > current_memory else "Memory"
+            usage = max(current_cpu, current_memory)
             return {
                 "type": IncidentType.RESOURCE_SATURATION,
                 "confidence": 0.85,
-                "reasoning": "Resource utilization critically high"
+                "reasoning": (
+                    f"{resource_type} utilization critically high at {usage}%. "
+                    f"Runbook source: {rb_source}."
+                )
             }
-        
-        if metrics.get("queue_depth", 0) > 1000:
+
+        if current_queue > max(baseline_queue * 2, 1000):
+            increase_pct = ((current_queue - baseline_queue) / baseline_queue * 100) if baseline_queue > 0 else 0
             return {
                 "type": IncidentType.QUEUE_DEPTH,
                 "confidence": 0.8,
-                "reasoning": "Message queue backlog growing rapidly"
+                "reasoning": (
+                    f"Queue depth elevated to {current_queue} (baseline: {baseline_queue}, +{increase_pct:.0f}%). "
+                    f"Runbook source: {rb_source}."
+                )
             }
-        
+
         return {
             "type": IncidentType.UNKNOWN,
             "confidence": 0.5,
-            "reasoning": "No clear pattern detected in metrics"
+            "reasoning": (
+                "No clear pattern detected in metrics; manual investigation recommended. "
+                f"Runbook source: {rb_source}."
+            ),
         }
-

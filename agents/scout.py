@@ -4,38 +4,40 @@ from typing import Dict, Any
 from datetime import datetime, timedelta
 from .base import BaseAgent
 from core.models import Evidence
-from integrations.tinyfish import TinyFishClient
-from integrations.tonic import TonicClient
+from integrations.jina import DocumentFetcher, LogFetcher
 
 
 class ScoutAgent(BaseAgent):
     """Scout agent pulls evidence: metrics, logs, traces, recent deploys."""
-    
+
     def __init__(self):
         super().__init__("Scout")
-        self.tinyfish = TinyFishClient()
-        self.tonic = TonicClient()
-    
+        self.doc_fetcher = DocumentFetcher()  # GitHub-based runbooks
+        self.log_fetcher = LogFetcher()      # GitHub-based logs
+
     async def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Gather all available evidence about the incident."""
         incident = context.get("incident")
         metrics = context.get("current_metrics", {})
-        
+
         # Gather metrics evidence
         metrics_evidence = self._gather_metrics(metrics)
-        
-        # Gather logs (simulated)
-        logs = await self._gather_logs(incident.service_name)
-        
-        # Check recent deployments
+
+        # Determine incident type string
+        incident_type_str = incident.incident_type.value if hasattr(incident, 'incident_type') else "latency_spike"
+
+        # Gather logs from GitHub
+        logs = await self._gather_logs(incident.service_name, incident_type_str)
+
+        # Check recent deployments (simulated)
         recent_deploys = await self._check_recent_deploys(incident.service_name)
-        
-        # Check dependencies
+
+        # Check dependencies (simulated)
         dependencies = self._check_dependencies(incident.service_name)
-        
-        # Use TinyFish/Yutori to pull runbooks if available
-        runbooks = await self._fetch_runbooks(incident.service_name)
-        
+
+        # Fetch runbooks from GitHub
+        runbooks = await self._fetch_runbooks(incident.service_name, incident_type_str)
+
         evidence = Evidence(
             metrics=metrics_evidence,
             logs=logs,
@@ -43,15 +45,16 @@ class ScoutAgent(BaseAgent):
             traces=[],  # Would integrate with Jaeger/Zipkin in production
             dependencies=dependencies
         )
-        
+
         # Add runbook info to context
         context["runbooks"] = runbooks
-        
+
         return {
             "evidence": evidence,
-            "summary": f"Collected {len(logs)} log entries, found {len(recent_deploys)} recent deploys"
+            "runbooks": runbooks,
+            "summary": f"Collected {len(logs)} log entries, found {len(recent_deploys)} recent deploys, fetched runbooks"
         }
-    
+
     def _gather_metrics(self, metrics: Dict[str, Any]) -> Dict[str, Any]:
         """Process and structure metrics data."""
         return {
@@ -64,20 +67,15 @@ class ScoutAgent(BaseAgent):
             "request_rate": metrics.get("request_rate", 0),
             "queue_depth": metrics.get("queue_depth", 0),
         }
-    
-    async def _gather_logs(self, service_name: str) -> list:
-        """Gather relevant log entries (simulated)."""
-        # In production, query ElasticSearch, Loki, or CloudWatch
-        return [
-            f"[ERROR] {service_name}: Connection timeout to database",
-            f"[WARN] {service_name}: High memory usage detected (85%)",
-            f"[INFO] {service_name}: Request processing took 4.5s",
-            f"[ERROR] {service_name}: Failed to connect to redis-cache: connection refused",
-        ]
-    
+
+    async def _gather_logs(self, service_name: str, incident_type: str = None) -> list:
+        """Fetch logs for demo from GitHub."""
+        incident_type = incident_type or "latency_spike"
+        logs = self.log_fetcher.fetch_logs(service_name, incident_type)
+        return logs
+
     async def _check_recent_deploys(self, service_name: str) -> list:
         """Check for recent deployments (simulated)."""
-        # In production, query CI/CD system (GitHub Actions, ArgoCD, etc.)
         now = datetime.utcnow()
         return [
             {
@@ -88,10 +86,9 @@ class ScoutAgent(BaseAgent):
                 "commit": "abc123f"
             }
         ]
-    
+
     def _check_dependencies(self, service_name: str) -> list:
         """Check service dependencies (simulated)."""
-        # In production, query service mesh or service registry
         dependencies_map = {
             "api-service": ["database", "redis-cache", "auth-service"],
             "database": [],
@@ -99,22 +96,16 @@ class ScoutAgent(BaseAgent):
             "auth-service": ["database"]
         }
         return dependencies_map.get(service_name, [])
-    
-    async def _fetch_runbooks(self, service_name: str) -> Dict[str, str]:
-        """Fetch runbooks using TinyFish/Yutori web agent."""
-        # Try to fetch actual runbooks from TinyFish API
-        incident_type = "general"  # This would be more specific in practice
-        runbooks = self.tinyfish.fetch_runbook(service_name, incident_type)
-        
-        if runbooks:
-            print(f"   📚 Fetched runbooks from TinyFish API")
-            return runbooks
-        
-        # Fallback to default runbooks if API unavailable
-        print(f"   ℹ️  Using default runbooks (TinyFish API unavailable)")
-        return {
-            "high_latency": "Check database connection pool, review recent queries, check for long-running transactions",
-            "high_error_rate": "Check dependency health, review recent deployments, check for configuration changes",
-            "resource_saturation": "Check for memory leaks, review container limits, check for resource-intensive operations"
-        }
 
+    async def _fetch_runbooks(self, service_name: str, incident_type: str = "latency_spike") -> Dict[str, str]:
+        """Fetch runbooks from GitHub for demo."""
+        try:
+            runbooks = self.doc_fetcher.fetch_runbook(service_name, incident_type)
+            if runbooks.get("source") != "Default Demo Runbooks":
+                print(f"   📚 Fetched runbooks from {runbooks.get('source')}")
+            else:
+                print(f"   ℹ️  Using default runbooks")
+            return runbooks
+        except Exception as e:
+            print(f"   ⚠️  Runbook fetch failed: {e}, using defaults")
+            return self.doc_fetcher._get_default_runbooks()
