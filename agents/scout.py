@@ -1,9 +1,9 @@
 """Scout Agent: Gathers evidence about an incident."""
-import json
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
+
 from .base import BaseAgent
-from core.models import Evidence
+from core.models import Evidence, IncidentType
 from integrations.jina import DocumentFetcher, LogFetcher
 
 
@@ -13,18 +13,24 @@ class ScoutAgent(BaseAgent):
     def __init__(self):
         super().__init__("Scout")
         self.doc_fetcher = DocumentFetcher()  # GitHub-based runbooks
-        self.log_fetcher = LogFetcher()      # GitHub-based logs
+        self.log_fetcher = LogFetcher()       # GitHub-based logs
 
     async def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Gather all available evidence about the incident."""
         incident = context.get("incident")
-        metrics = context.get("current_metrics", {})
+        current_metrics = context.get("current_metrics", {}) or {}
+        baseline_metrics = context.get("baseline_metrics", {}) or {}
 
         # Gather metrics evidence
-        metrics_evidence = self._gather_metrics(metrics)
+        metrics_evidence = self._gather_metrics(current_metrics)
 
-        # Determine incident type string
-        incident_type_str = incident.incident_type.value if hasattr(incident, 'incident_type') else "latency_spike"
+        # Determine incident type string for fetching logs/runbooks
+        incident_type_str = self._resolve_incident_type_str(
+            incident=incident,
+            current=current_metrics,
+            baseline=baseline_metrics,
+        )
+        context["scout_inferred_incident_type"] = incident_type_str  # helpful for debugging
 
         # Gather logs from GitHub
         logs = await self._gather_logs(incident.service_name, incident_type_str)
@@ -52,7 +58,11 @@ class ScoutAgent(BaseAgent):
         return {
             "evidence": evidence,
             "runbooks": runbooks,
-            "summary": f"Collected {len(logs)} log entries, found {len(recent_deploys)} recent deploys, fetched runbooks"
+            "summary": (
+                f"Collected {len(logs)} log entries, "
+                f"found {len(recent_deploys)} recent deploys, "
+                f"fetched runbooks for type='{incident_type_str}'"
+            )
         }
 
     def _gather_metrics(self, metrics: Dict[str, Any]) -> Dict[str, Any]:
@@ -68,11 +78,77 @@ class ScoutAgent(BaseAgent):
             "queue_depth": metrics.get("queue_depth", 0),
         }
 
-    async def _gather_logs(self, service_name: str, incident_type: str = None) -> list:
+    def _resolve_incident_type_str(
+        self,
+        incident: Any,
+        current: Dict[str, Any],
+        baseline: Dict[str, Any],
+    ) -> str:
+        """
+        Scout runs before triage, so incident.incident_type is often UNKNOWN.
+        Infer a best-guess type from metrics so we fetch the right logs/runbooks.
+        """
+        # If incident already has a non-unknown type, use it
+        if hasattr(incident, "incident_type") and incident.incident_type:
+            try:
+                if incident.incident_type != IncidentType.UNKNOWN:
+                    return incident.incident_type.value
+            except Exception:
+                pass
+
+        # Otherwise infer from metrics
+        inferred = self._infer_incident_type(current, baseline)
+        return inferred.value
+
+    def _infer_incident_type(
+        self,
+        current: Dict[str, Any],
+        baseline: Dict[str, Any],
+    ) -> IncidentType:
+        """
+        Simple heuristic classifier (fast + deterministic):
+        - latency_spike if p99 > max(1000ms, 2x baseline)
+        - error_rate_increase if error_rate > max(5%, 2x baseline)
+        - resource_saturation if cpu>85 or mem>85
+        - queue_depth_growth if queue > max(1000, 2x baseline)
+        """
+        cur_p99 = float(current.get("latency_p99", 0) or 0)
+        base_p99 = float(baseline.get("latency_p99", 0) or 0)
+
+        cur_err = float(current.get("error_rate", 0) or 0)
+        base_err = float(baseline.get("error_rate", 0) or 0)
+
+        cur_cpu = float(current.get("cpu_usage", 0) or 0)
+        cur_mem = float(current.get("memory_usage", 0) or 0)
+
+        cur_q = float(current.get("queue_depth", 0) or 0)
+        base_q = float(baseline.get("queue_depth", 0) or 0)
+
+        # Latency spike
+        latency_threshold = max(1000.0, (base_p99 * 2.0) if base_p99 > 0 else 1000.0)
+        if cur_p99 >= latency_threshold:
+            return IncidentType.LATENCY_SPIKE
+
+        # Error rate increase
+        err_threshold = max(5.0, (base_err * 2.0) if base_err > 0 else 5.0)
+        if cur_err >= err_threshold:
+            return IncidentType.ERROR_RATE
+
+        # Resource saturation
+        if cur_cpu >= 85.0 or cur_mem >= 85.0:
+            return IncidentType.RESOURCE_SATURATION
+
+        # Queue depth growth
+        queue_threshold = max(1000.0, (base_q * 2.0) if base_q > 0 else 1000.0)
+        if cur_q >= queue_threshold:
+            return IncidentType.QUEUE_DEPTH
+
+        return IncidentType.UNKNOWN
+
+    async def _gather_logs(self, service_name: str, incident_type: Optional[str] = None) -> list:
         """Fetch logs for demo from GitHub."""
         incident_type = incident_type or "latency_spike"
-        logs = self.log_fetcher.fetch_logs(service_name, incident_type)
-        return logs
+        return self.log_fetcher.fetch_logs(service_name, incident_type)
 
     async def _check_recent_deploys(self, service_name: str) -> list:
         """Check for recent deployments (simulated)."""
@@ -83,7 +159,7 @@ class ScoutAgent(BaseAgent):
                 "version": "v1.2.3",
                 "deployed_at": (now - timedelta(minutes=15)).isoformat(),
                 "deployed_by": "deploy-bot",
-                "commit": "abc123f"
+                "commit": "abc123f",
             }
         ]
 
@@ -93,7 +169,7 @@ class ScoutAgent(BaseAgent):
             "api-service": ["database", "redis-cache", "auth-service"],
             "database": [],
             "redis-cache": [],
-            "auth-service": ["database"]
+            "auth-service": ["database"],
         }
         return dependencies_map.get(service_name, [])
 
