@@ -520,8 +520,9 @@
 
       try {
         const url = type
-          ? `/api/incidents/simulate?incident_type=${encodeURIComponent(type)}&auto_approve=true`
-          : '/api/incidents/simulate?auto_approve=true';
+            ? `/api/incidents/simulate?incident_type=${type}&auto_approve=false`
+            : '/api/incidents/simulate?auto_approve=false';
+
 
         const data = await apiPost(url);
 
