@@ -21,10 +21,10 @@ class GeminiClient:
 
         if self.api_key and self.api_key != "your_key_here":
             self.client = genai.Client(api_key=self.api_key)
-            print("   ✅ [GEMINI] Initialized (google-genai)")
+            print("[GEMINI] Initialized (google-genai)")
         else:
             self.client = None
-            print("   ⚠️  [GEMINI] No API key - AI features disabled")
+            print("[GEMINI] No API key - AI features disabled")
 
     def generate_content(
         self,
@@ -34,7 +34,7 @@ class GeminiClient:
     ) -> Optional[str]:
         """Generate text using Gemini."""
         if not self.client:
-            print("   ⚠️  [GEMINI] Client not initialized")
+            print("[GEMINI] Client not initialized")
             return None
 
         try:
@@ -49,11 +49,11 @@ class GeminiClient:
             text = getattr(resp, "text", None)
             if text:
                 return text
-            print("   ⚠️  [GEMINI] Empty response from API")
+            print("[GEMINI] Empty response from API")
             return None
 
         except Exception as e:
-            print(f"   ❌ [GEMINI] API call failed: {e}")
+            print(f"[GEMINI] API call failed: {e}")
             return None
 
     def generate_json(
@@ -82,6 +82,6 @@ class GeminiClient:
         try:
             return json.loads(cleaned)
         except json.JSONDecodeError as e:
-            print(f"   ❌ [GEMINI] Failed to parse JSON: {e}")
-            print(f"   Response was: {response_text[:300]}")
+            print(f"[GEMINI] Failed to parse JSON: {e}")
+            print(f"Response was: {response_text[:300]}")
             return None

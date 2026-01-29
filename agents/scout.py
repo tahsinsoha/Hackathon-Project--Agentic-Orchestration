@@ -84,10 +84,6 @@ class ScoutAgent(BaseAgent):
         current: Dict[str, Any],
         baseline: Dict[str, Any],
     ) -> str:
-        """
-        Scout runs before triage, so incident.incident_type is often UNKNOWN.
-        Infer a best-guess type from metrics so we fetch the right logs/runbooks.
-        """
         # If incident already has a non-unknown type, use it
         if hasattr(incident, "incident_type") and incident.incident_type:
             try:
@@ -178,10 +174,10 @@ class ScoutAgent(BaseAgent):
         try:
             runbooks = self.doc_fetcher.fetch_runbook(service_name, incident_type)
             if runbooks.get("source") != "Default Demo Runbooks":
-                print(f"   📚 Fetched runbooks from {runbooks.get('source')}")
+                print(f"Fetched runbooks from {runbooks.get('source')}")
             else:
-                print(f"   ℹ️  Using default runbooks")
+                print(f"Using default runbooks")
             return runbooks
         except Exception as e:
-            print(f"   ⚠️  Runbook fetch failed: {e}, using defaults")
+            print(f"Runbook fetch failed: {e}, using defaults")
             return self.doc_fetcher._get_default_runbooks()

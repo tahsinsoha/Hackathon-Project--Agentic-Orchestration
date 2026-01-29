@@ -1,4 +1,3 @@
-"""Experiment/Verifier Agent: Validates hypotheses."""
 from typing import Dict, Any, List
 from .base import BaseAgent
 from core.models import Hypothesis, ExperimentResult, Evidence

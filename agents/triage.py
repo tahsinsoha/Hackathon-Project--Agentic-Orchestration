@@ -1,7 +1,5 @@
-"""Triage Agent: Classifies incident type using Google Gemini + Runbooks."""
 import json
 from typing import Dict, Any, Optional
-
 from .base import BaseAgent
 from core.models import IncidentType, Evidence
 
@@ -34,17 +32,17 @@ class TriageAgent(BaseAgent):
     ) -> Dict[str, Any]:
         """Classify incident using Google Gemini or fallback to rules."""
         if self.ai_client:
-            print("   🔑 [TRIAGE] Google Gemini API available, attempting AI classification...")
+            print("[TRIAGE] Google Gemini API available, attempting AI classification...")
             try:
                 result = await self._classify_with_gemini(evidence, runbooks, context)
                 if result:
-                    print("   ✅ [TRIAGE] Using Google Gemini AI for classification")
+                    print("[TRIAGE] Using Google Gemini AI for classification")
                     return result
-                print("   ⚠️  [TRIAGE] Gemini returned empty result, using fallback")
+                print("[TRIAGE] Gemini returned empty result, using fallback")
             except Exception as e:
-                print(f"   ⚠️  [TRIAGE] Gemini API failed: {e}, using rule-based fallback")
+                print(f"[TRIAGE] Gemini API failed: {e}, using rule-based fallback")
         else:
-            print("   ℹ️  [TRIAGE] No AI client available, using rule-based classification")
+            print("[TRIAGE] No AI client available, using rule-based classification")
 
         return self._classify_with_rules(evidence, runbooks, context)
 
@@ -53,13 +51,7 @@ class TriageAgent(BaseAgent):
         runbooks: Dict[str, Any],
         max_chars: int = 1200
     ) -> str:
-        """
-        Convert runbook dict into a short, prompt-friendly snippet.
-        Scout's DocumentFetcher returns:
-          { "<incident_type>": "<summary>", "source": "...", "full_content": "..." }
 
-        We will prefer 'full_content' (if present) but trim it.
-        """
         if not runbooks:
             return "No runbook content available."
 
@@ -173,7 +165,7 @@ Respond ONLY with a valid JSON object in this exact format (no markdown, no extr
             return None
 
         if "type" not in result or "confidence" not in result or "reasoning" not in result:
-            print(f"   ⚠️  [TRIAGE] Missing required fields in Gemini response: {result}")
+            print(f"[TRIAGE] Missing required fields in Gemini response: {result}")
             return None
 
         type_map = {
@@ -185,7 +177,7 @@ Respond ONLY with a valid JSON object in this exact format (no markdown, no extr
 
         incident_type = type_map.get(result["type"], IncidentType.UNKNOWN)
         if incident_type == IncidentType.UNKNOWN:
-            print(f"   ⚠️  [TRIAGE] Unknown incident type from Gemini: {result['type']}")
+            print(f"[TRIAGE] Unknown incident type from Gemini: {result['type']}")
 
         return {
             "type": incident_type,

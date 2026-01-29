@@ -1,4 +1,3 @@
-"""FastAPI REST API for Incident Autopilot."""
 import datetime
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
@@ -48,7 +47,6 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
     return {"status": "healthy", "service": "incident-autopilot"}
 
 
@@ -58,12 +56,7 @@ async def simulate_incident(
     auto_approve: bool = True,
     background_tasks: BackgroundTasks = None
 ):
-    """Simulate and process an incident.
-    
-    Args:
-        incident_type: Type of incident to simulate (latency_spike, error_rate, etc.)
-        auto_approve: Whether to auto-approve mitigations
-    """
+
     try:
         # Generate incident
         incident, current_metrics, baseline_metrics = simulator.generate_incident(incident_type)
@@ -145,7 +138,6 @@ async def approve_mitigation(incident_id: str):
             "mitigation": incident.applied_mitigation.dict(),
         }
 
-    # 1) Mark approved
     incident.mitigation_approved = True
     incident.add_timeline_event(
         "approval",
@@ -154,7 +146,6 @@ async def approve_mitigation(incident_id: str):
     )
     incident_store.update_incident(incident_id, incident)
 
-    # 2) Apply mitigation NOW (HITL trigger)
     approved_at_ts = time.time()
 
     apply_result = await pipeline.executor.apply_mitigation(
@@ -175,8 +166,6 @@ async def approve_mitigation(incident_id: str):
     incident.applied_mitigation = incident.proposed_mitigation
     incident.stage = AgentStage.POSTCHECK
 
-    # ✅ Compute TTM safely
-    # Prefer pipeline_start_ts if you added it in IncidentMetrics; otherwise fall back to "approved_at"
     start_ts = getattr(incident.metrics, "pipeline_start_ts", 0.0) or approved_at_ts
     if not incident.metrics.time_to_mitigation_seconds:
         incident.metrics.time_to_mitigation_seconds = max(0.0, time.time() - start_ts)
@@ -192,10 +181,9 @@ async def approve_mitigation(incident_id: str):
     )
     incident_store.update_incident(incident_id, incident)
 
-    # 4) Run postcheck (finish the pipeline)
     context = {
         "incident": incident,
-        "current_metrics": {},  # _run_postcheck will overwrite via _simulate_recovery
+        "current_metrics": {},
         "baseline_metrics": {},
         "most_likely_cause": None,
     }
@@ -438,8 +426,7 @@ async def demo_tonic_retool(incident_type: Optional[str] = None):
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("INCIDENT_AUTOPILOT_PORT", 8000))
-    print(f"\n🚀 Starting Incident Autopilot on http://localhost:{port}")
-    print(f"📊 Dashboard: http://localhost:{port}")
-    print(f"📚 API Docs: http://localhost:{port}/docs\n")
+    print(f"\nStarting Incident Autopilot on http://localhost:{port}")
+    print(f"Dashboard: http://localhost:{port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
 

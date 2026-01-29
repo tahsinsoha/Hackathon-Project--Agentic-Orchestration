@@ -1,4 +1,3 @@
-"""Hypothesis Agent: Proposes root cause hypotheses using AI."""
 import json
 from typing import Dict, Any, List
 from .base import BaseAgent
@@ -19,22 +18,22 @@ class HypothesisAgent(BaseAgent):
         
         # Try AI generation first
         if self.ai_client:
-            print(f"   🔑 [HYPOTHESIS] Using Gemini AI to generate hypotheses...")
+            print(f"[HYPOTHESIS] Using Gemini AI to generate hypotheses")
             try:
                 hypotheses = await self._generate_with_ai(
                     incident_type, evidence, triage_reasoning
                 )
                 if hypotheses:
-                    print(f"   ✅ [HYPOTHESIS] Generated {len(hypotheses)} AI-powered hypotheses")
+                    print(f"[HYPOTHESIS] Generated {len(hypotheses)} AI-powered hypotheses")
                     return {
                         "hypotheses": hypotheses,
                         "summary": f"Generated {len(hypotheses)} AI-powered hypotheses"
                     }
             except Exception as e:
-                print(f"   ⚠️  [HYPOTHESIS] AI generation failed: {e}, using rule-based fallback")
+                print(f"[HYPOTHESIS] AI generation failed: {e}, using rule-based fallback")
         
         # Fallback to rule-based
-        print(f"   ℹ️  [HYPOTHESIS] Using rule-based hypothesis generation")
+        print(f"[HYPOTHESIS] Using rule-based hypothesis generation")
         hypotheses = self._generate_with_rules(incident_type, evidence)
         
         return {

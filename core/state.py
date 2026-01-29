@@ -1,4 +1,3 @@
-"""State management for incidents."""
 import json
 from typing import Dict, Optional, List
 from datetime import datetime
@@ -6,7 +5,6 @@ from .models import Incident, AgentStage
 
 
 class IncidentStore:
-    """In-memory store for incidents (in production, use Redis/PostgreSQL)."""
     
     def __init__(self):
         self.incidents: Dict[str, Incident] = {}

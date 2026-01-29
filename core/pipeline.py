@@ -1,13 +1,3 @@
-"""
-Multi-agent orchestration pipeline.
-
-✅ HITL (Human-in-the-loop) behavior:
-- If a mitigation requires approval AND auto_approve=False:
-  - pipeline pauses after proposing mitigation
-  - incident is saved with proposed_mitigation + "awaiting approval" timeline
-  - pipeline returns immediately (does NOT apply mitigation, does NOT postcheck, does NOT complete)
-- Mitigation is applied later via /api/incidents/{id}/approve endpoint.
-"""
 import time
 from typing import Dict, Any, Optional
 from datetime import datetime
@@ -25,7 +15,6 @@ from agents.postcheck import PostcheckAgent
 
 
 class IncidentPipeline:
-    """Orchestrates the multi-agent incident response pipeline."""
 
     def __init__(self, guardrail_config: Optional[Dict[str, Any]] = None):
         self.guardrails = GuardrailEngine(guardrail_config)
@@ -45,21 +34,10 @@ class IncidentPipeline:
         baseline_metrics: Dict[str, Any],
         auto_approve: bool = False
     ) -> Incident:
-        """Run the incident response pipeline.
-
-        Args:
-            incident: The incident to process
-            current_metrics: Current metric values
-            baseline_metrics: Baseline metric values for comparison
-            auto_approve: If True, pipeline will not pause for HITL approvals (demo mode)
-
-        Returns:
-            Updated incident with agent outputs
-        """
         detection_start = time.time()
 
         print(f"\n{'='*60}")
-        print(f"🚨 INCIDENT PIPELINE STARTED: {incident.id}")
+        print(f"INCIDENT PIPELINE STARTED: {incident.id}")
         print(f"Service: {incident.service_name}")
         print(f"{'='*60}\n")
 
@@ -89,8 +67,6 @@ class IncidentPipeline:
             # Stage 5: Executor
             incident = await self._run_executor(incident, context, auto_approve)
 
-            # ✅ HITL STOP: If we proposed a mitigation requiring approval and it’s not approved yet,
-            # pause pipeline here and return. Approval endpoint will continue later.
             if (
                 incident.proposed_mitigation
                 and incident.proposed_mitigation.requires_approval
@@ -128,7 +104,7 @@ class IncidentPipeline:
             )
 
         except Exception as e:
-            print(f"❌ Pipeline failed: {e}")
+            print(f"Pipeline failed: {e}")
             incident.stage = AgentStage.FAILED
             incident.add_timeline_event("failed", f"Pipeline failed: {str(e)}")
 
@@ -138,7 +114,7 @@ class IncidentPipeline:
         # Print summary safely
         ttm = incident.metrics.time_to_mitigation_seconds or 0.0
         print(f"\n{'='*60}")
-        print(f"✅ INCIDENT PIPELINE FINISHED: {incident.id}")
+        print(f"INCIDENT PIPELINE FINISHED: {incident.id}")
         print(f"Stage: {incident.stage.value}")
         print(f"Time to mitigation: {ttm:.1f}s")
         print(f"Success: {incident.metrics.mitigation_success}")
@@ -147,7 +123,7 @@ class IncidentPipeline:
         return incident
 
     async def _run_scout(self, incident: Incident, context: Dict[str, Any]) -> Incident:
-        print("🔍 [SCOUT] Gathering evidence...")
+        print("[SCOUT] Gathering evidence...")
         incident.stage = AgentStage.SCOUT
 
         result = await self.scout.execute(context)
@@ -166,7 +142,7 @@ class IncidentPipeline:
         return incident
 
     async def _run_triage(self, incident: Incident, context: Dict[str, Any]) -> Incident:
-        print("🏥 [TRIAGE] Classifying incident type...")
+        print("[TRIAGE] Classifying incident type...")
         incident.stage = AgentStage.TRIAGE
 
         result = await self.triage.execute(context)
@@ -183,12 +159,12 @@ class IncidentPipeline:
 
         incident_store.update_incident(incident.id, incident)
 
-        print(f"   ✓ Type: {result['incident_type'].value} (confidence: {result['confidence']:.0%})")
-        print(f"   ✓ {result['reasoning']}")
+        print(f"Type: {result['incident_type'].value} (confidence: {result['confidence']:.0%})")
+        print(f"{result['reasoning']}")
         return incident
 
     async def _run_hypothesis(self, incident: Incident, context: Dict[str, Any]) -> Incident:
-        print("💡 [HYPOTHESIS] Generating root cause hypotheses...")
+        print("[HYPOTHESIS] Generating root cause hypotheses...")
         incident.stage = AgentStage.HYPOTHESIS
 
         result = await self.hypothesis.execute(context)
@@ -203,11 +179,11 @@ class IncidentPipeline:
 
         print(f"   ✓ Generated {len(result['hypotheses'])} hypotheses:")
         for i, h in enumerate(result["hypotheses"], 1):
-            print(f"     {i}. {h.description} (confidence: {h.confidence:.0%})")
+            print(f"{i}. {h.description} (confidence: {h.confidence:.0%})")
         return incident
 
     async def _run_experiment(self, incident: Incident, context: Dict[str, Any]) -> Incident:
-        print("🧪 [EXPERIMENT] Validating hypotheses...")
+        print("[EXPERIMENT] Validating hypotheses...")
         incident.stage = AgentStage.EXPERIMENT
 
         result = await self.experiment.execute(context)
@@ -220,19 +196,19 @@ class IncidentPipeline:
 
         incident_store.update_incident(incident.id, incident)
 
-        print(f"   ✓ {result['summary']}")
+        print(f"{result['summary']}")
         best = result["most_likely_cause"]
-        print(f"   ✓ Most likely: {best.findings}")
+        print(f"Most likely: {best.findings}")
         return incident
 
     async def _run_executor(self, incident: Incident, context: Dict[str, Any], auto_approve: bool) -> Incident:
-        print("⚡ [EXECUTOR] Proposing mitigation...")
+        print(f"[EXECUTOR] Proposing mitigation...")
         incident.stage = AgentStage.EXECUTOR
 
         result = await self.executor.execute(context)
 
         if result["status"] == "blocked":
-            print(f"   ⚠️  Mitigation blocked by guardrails: {result['reason']}")
+            print(f"Mitigation blocked by guardrails: {result['reason']}")
             incident.add_timeline_event("executor", "Mitigation blocked by guardrails", {
                 "reason": result["reason"],
             })
@@ -242,13 +218,12 @@ class IncidentPipeline:
         mitigation = result["mitigation"]
         incident.proposed_mitigation = mitigation
 
-        print(f"   ✓ Proposed: {mitigation.type.value}")
-        print(f"   ✓ {mitigation.description}")
-        print(f"   ✓ Risk: {mitigation.risk_level}, Reversible: {mitigation.reversible}")
+        print(f"Proposed: {mitigation.type.value}")
+        print(f"{mitigation.description}")
+        print(f"Risk: {mitigation.risk_level}, Reversible: {mitigation.reversible}")
 
-        # ✅ HITL pause point
         if mitigation.requires_approval and not auto_approve:
-            print("   ⏸️  Waiting for human approval...")
+            print("Waiting for human approval...")
             incident.add_timeline_event(
                 "executor",
                 "Mitigation proposed — awaiting human approval",
@@ -258,7 +233,7 @@ class IncidentPipeline:
             return incident
 
         # Apply mitigation
-        print("   🔧 Applying mitigation...")
+        print("Applying mitigation...")
         apply_result = await self.executor.apply_mitigation(mitigation, incident.service_name)
 
         if apply_result["success"]:
@@ -274,16 +249,16 @@ class IncidentPipeline:
                 "applied_at": apply_result.get("applied_at"),
             })
 
-            print(f"   ✅ Mitigation applied successfully (time: {mitigation_time:.1f}s)")
+            print(f"Mitigation applied successfully (time: {mitigation_time:.1f}s)")
         else:
-            print(f"   ❌ Mitigation failed: {apply_result.get('message')}")
+            print(f"Mitigation failed: {apply_result.get('message')}")
             incident.add_timeline_event("executor", "Mitigation apply failed", apply_result)
 
         incident_store.update_incident(incident.id, incident)
         return incident
 
     async def _run_postcheck(self, incident: Incident, context: Dict[str, Any]) -> Incident:
-        print("✅ [POSTCHECK] Verifying recovery...")
+        print("[POSTCHECK] Verifying recovery...")
         incident.stage = AgentStage.POSTCHECK
 
         # Simulate metrics improving after mitigation
@@ -299,11 +274,11 @@ class IncidentPipeline:
         })
 
         if result["metrics_recovered"]:
-            print("   ✅ Metrics recovered successfully")
+            print("Metrics recovered successfully")
         else:
-            print("   ⚠️  Metrics not fully recovered")
+            print("Metrics not fully recovered")
 
-        print("   ✓ Generated incident report")
+        print("Generated incident report")
 
         incident_store.update_incident(incident.id, incident)
         return incident

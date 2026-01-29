@@ -1,4 +1,3 @@
-"""Guardrail system to ensure safe mitigation actions."""
 from typing import Dict, Any
 from .models import Mitigation, MitigationType, GuardrailCheck, IncidentSeverity
 
@@ -23,16 +22,6 @@ class GuardrailEngine:
     
     def check_mitigation(self, mitigation: Mitigation, severity: IncidentSeverity, 
                         service_name: str) -> GuardrailCheck:
-        """Check if a mitigation is safe to execute.
-        
-        Args:
-            mitigation: The proposed mitigation
-            severity: Incident severity level
-            service_name: Name of the affected service
-            
-        Returns:
-            GuardrailCheck with pass/fail and reason
-        """
         # Check 1: Reversibility requirement
         if not mitigation.reversible:
             return GuardrailCheck(
@@ -76,7 +65,6 @@ class GuardrailEngine:
     
     def validate_rollback(self, deploy_time: str) -> GuardrailCheck:
         """Validate that a rollback target is recent enough."""
-        # In production, check deploy_time is within rollback window
         return GuardrailCheck(
             passed=True,
             reason="Rollback target is within acceptable time window"

@@ -21,22 +21,22 @@ class DocumentFetcher:
 
         url = runbook_files.get(incident_type)
         if not url:
-            print(f"   ℹ️  No runbook URL for incident type: {incident_type}")
+            print(f"No runbook URL for incident type: {incident_type}")
             return self._get_default_runbooks()
 
         try:
-            print(f"   🌐 Fetching runbook from: {url}")
+            print(f"Fetching runbook from: {url}")
             content = self._fetch_from_github(url)
 
             if content:
-                print(f"   ✅ Fetched {len(content)} characters from runbook")
+                print(f"Fetched {len(content)} characters from runbook")
                 return self._parse_runbook_content(content, incident_type)
             else:
-                print(f"   ⚠️ Failed to fetch runbook, using defaults")
+                print(f"Failed to fetch runbook, using defaults")
                 return self._get_default_runbooks()
 
         except Exception as e:
-            print(f"   ❌ Error fetching runbook: {e}")
+            print(f"Error fetching runbook: {e}")
             return self._get_default_runbooks()
 
     def _fetch_from_github(self, url: str) -> Optional[str]:
@@ -46,10 +46,10 @@ class DocumentFetcher:
             if resp.status_code == 200:
                 return resp.text
             else:
-                print(f"   ⚠️ GitHub returned {resp.status_code}")
+                print(f"GitHub returned {resp.status_code}")
                 return None
         except Exception as e:
-            print(f"   ❌ GitHub fetch error: {e}")
+            print(f"GitHub fetch error: {e}")
             return None
 
     def _parse_runbook_content(self, content: str, incident_type: str) -> Dict[str, str]:
@@ -81,7 +81,7 @@ class LogFetcher:
     def fetch_logs(self, service_name: str, incident_type: str) -> List[str]:
         """Fetch log file lines from GitHub."""
         url = f"{self.github_base}/{service_name}/{incident_type}.log"
-        print(f"   📄 Fetching logs from: {url}")
+        print(f"Fetching logs from: {url}")
         try:
             resp = requests.get(url, timeout=10)
             if resp.status_code == 200:

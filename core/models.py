@@ -1,4 +1,3 @@
-"""Data models for incident management."""
 from enum import Enum
 from typing import Dict, List, Optional, Any
 from datetime import datetime
@@ -6,7 +5,6 @@ from pydantic import BaseModel, Field
 
 
 class IncidentType(str, Enum):
-    """Types of incidents we can detect."""
     LATENCY_SPIKE = "latency_spike"
     ERROR_RATE = "error_rate_increase"
     RESOURCE_SATURATION = "resource_saturation"

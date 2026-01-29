@@ -1,5 +1,4 @@
 # agents/executor.py
-"""Executor Agent: Applies mitigations with guardrails (context-driven, demo-friendly)."""
 from typing import Dict, Any, Optional, Tuple
 from datetime import datetime, timezone
 
@@ -59,7 +58,7 @@ class ExecutorAgent(BaseAgent):
 
         # Approval request to Retool if required
         if mitigation.requires_approval:
-            print(f"\n   🔔 Mitigation requires approval - Calling Retool API...")
+            print(f"\n Mitigation requires approval - Calling Retool API...")
             mitigation_dict = {
                 "type": mitigation.type.value,
                 "description": mitigation.description,
@@ -68,7 +67,7 @@ class ExecutorAgent(BaseAgent):
             }
             approval_sent = self.retool.send_approval_request(incident.id, mitigation_dict)
             if approval_sent:
-                print(f"   ✅ Retool approval workflow triggered successfully!")
+                print(f"Retool approval workflow triggered successfully!")
 
         # Visualization (demo)
         incident_data = {
@@ -78,7 +77,7 @@ class ExecutorAgent(BaseAgent):
             "type": incident.incident_type.value,
         }
         visual_url = self.freepik.generate_incident_card(incident_data)
-        print(f"   🎨 Generated incident visualization: {visual_url}")
+        print(f"Generated incident visualization: {visual_url}")
 
         return {
             "mitigation": mitigation,
@@ -88,9 +87,6 @@ class ExecutorAgent(BaseAgent):
             "visual_url": visual_url,
         }
 
-    # -----------------------------
-    # Mitigation proposal (context-driven)
-    # -----------------------------
     def _propose_mitigation(self, incident_type: IncidentType, root_cause: str, context: Dict[str, Any]) -> Mitigation:
         evidence = context.get("evidence")
         metrics = evidence.metrics if evidence else {}
@@ -110,7 +106,7 @@ class ExecutorAgent(BaseAgent):
         prefer_scale = ("scale" in rb_text) or ("replica" in rb_text) or ("autoscal" in rb_text)
         prefer_disable = ("feature flag" in rb_text) or ("disable" in rb_text) or ("degrade" in rb_text)
 
-        # --- 1) Deployment regression -> rollback (use deploy history)
+        #Deployment regression -> rollback (use deploy history)
         if self._mentions_deploy(root_cause) or (prefer_rollback and deploys):
             current_v, prev_v = self._current_and_previous_versions(deploys)
 
@@ -134,7 +130,7 @@ class ExecutorAgent(BaseAgent):
                     m.requires_approval = True
                 return m
 
-        # --- 2) Resource saturation -> scale up (computed target)
+        #Resource saturation -> scale up (computed target)
         if incident_type == IncidentType.RESOURCE_SATURATION or ("resource" in root_cause.lower()) or ("memory" in root_cause.lower()) or prefer_scale:
             target_replicas = self._compute_scale_target(metrics, current_replicas)
             m = Mitigation(
@@ -153,7 +149,7 @@ class ExecutorAgent(BaseAgent):
             )
             return m
 
-        # --- 3) Dependency failure -> feature flag disable / degrade mode (context-driven flag)
+        #Dependency failure -> feature flag disable / degrade mode (context-driven flag)
         if ("dependency" in root_cause.lower()) or ("downstream" in root_cause.lower()) or prefer_disable:
             feature, fallback = self._choose_feature_flag(service_state, rb_text)
 
@@ -171,7 +167,7 @@ class ExecutorAgent(BaseAgent):
                 requires_approval=False,
             )
 
-        # --- 4) Elevated error rate -> restart service (treat as reversible in guardrails)
+        #Elevated error rate -> restart service (treat as reversible in guardrails)
         if incident_type == IncidentType.ERROR_RATE:
             # Strategy derived from context (defaults are safe)
             strategy = service_state.get("restart_strategy", "rolling")
@@ -191,7 +187,7 @@ class ExecutorAgent(BaseAgent):
                 requires_approval=False,  # guardrails can set True
             )
 
-        # --- 5) Default: conservative scale-up (computed)
+        #Default: conservative scale-up (computed)
         target_replicas = self._compute_scale_target(metrics, current_replicas, default_bump=1)
         return Mitigation(
             type=MitigationType.SCALE_UP,
@@ -208,18 +204,12 @@ class ExecutorAgent(BaseAgent):
             requires_approval=False,
         )
 
-    # -----------------------------
-    # Apply mitigation (demo, but stateful + time-aware)
-    # -----------------------------
     async def apply_mitigation(self, mitigation: Mitigation, service_name: str) -> Dict[str, Any]:
         """Execute the mitigation (simulated) and update context-like state if provided."""
         print(f"[EXECUTOR] Applying {mitigation.type.value} to {service_name}")
         print(f"[EXECUTOR] Parameters: {mitigation.parameters}")
 
         applied_at = datetime.now(timezone.utc).isoformat()
-
-        # In a real system you'd call: K8s API / ArgoCD / LaunchDarkly / Service Mesh.
-        # For demo we just succeed and return a structured result.
         return {
             "success": True,
             "mitigation_type": mitigation.type.value,
@@ -227,9 +217,6 @@ class ExecutorAgent(BaseAgent):
             "message": f"Successfully applied {mitigation.type.value}",
         }
 
-    # -----------------------------
-    # Helpers
-    # -----------------------------
     def _mentions_deploy(self, text: str) -> bool:
         t = (text or "").lower()
         return ("deploy" in t) or ("deployment" in t) or ("rollout" in t) or ("release" in t)
@@ -301,13 +288,6 @@ class ExecutorAgent(BaseAgent):
         return "mixed_signals"
 
     def _choose_feature_flag(self, service_state: dict, rb_text: str) -> Tuple[str, str]:
-        """
-        Pick a feature flag to disable.
-        Priority:
-        1) If runbook mentions something like 'cache', disable cache integration
-        2) Else pick first flag in service_state.feature_flags
-        3) Else default names
-        """
         flags = (service_state.get("feature_flags") or {})
         rb = rb_text or ""
 

@@ -72,17 +72,17 @@ class RetoolClient:
                 )
                 
                 if response.status_code in [200, 201, 202]:
-                    print(f"   ✅ Workflow triggered successfully!")
-                    print(f"   🎉 Check Retool Workflows dashboard for the run")
+                    print(f"Workflow triggered successfully!")
+                    print(f"Check Retool Workflows dashboard for the run")
                     print("="*70 + "\n")
                     return True
                 else:
-                    print(f"   ⚠️  Webhook returned status {response.status_code}")
+                    print(f"Webhook returned status {response.status_code}")
                     print("="*70 + "\n")
                     return False
                     
             except Exception as e:
-                print(f"   ❌ Webhook call failed: {e}")
+                print(f"Webhook call failed: {e}")
                 print("="*70 + "\n")
                 return False
         
@@ -91,11 +91,11 @@ class RetoolClient:
             print("\n" + "="*70)
             print("   ⚡ RETOOL INTEGRATION - Approval Workflow (Demo Mode)")
             print("="*70)
-            print(f"   🎯 Incident ID: {incident_id}")
-            print(f"   📋 Mitigation Type: {mitigation.get('type', 'unknown')}")
-            print(f"   🔍 Risk Level: {mitigation.get('risk_level', 'unknown')}")
-            print(f"   ℹ️  Mode: Demo (set RETOOL_WEBHOOK_URL or RETOOL_API_KEY)")
-            print(f"   ✅ Approval request simulated - would trigger Retool Workflow")
+            print(f"Incident ID: {incident_id}")
+            print(f"Mitigation Type: {mitigation.get('type', 'unknown')}")
+            print(f"Risk Level: {mitigation.get('risk_level', 'unknown')}")
+            print(f"Mode: Demo (set RETOOL_WEBHOOK_URL or RETOOL_API_KEY)")
+            print(f"Approval request simulated - would trigger Retool Workflow")
             print("="*70 + "\n")
             return True
         
@@ -103,10 +103,10 @@ class RetoolClient:
         print("\n" + "="*70)
         print("   ⚡ RETOOL WORKFLOW - Triggering via API")
         print("="*70)
-        print(f"   🎯 Incident ID: {incident_id}")
-        print(f"   📋 Mitigation Type: {mitigation.get('type', 'unknown')}")
-        print(f"   🔍 Risk Level: {mitigation.get('risk_level', 'unknown')}")
-        print(f"   🔑 Using API Key authentication")
+        print(f"Incident ID: {incident_id}")
+        print(f"Mitigation Type: {mitigation.get('type', 'unknown')}")
+        print(f"Risk Level: {mitigation.get('risk_level', 'unknown')}")
+        print(f"Using API Key authentication")
         
         try:
             # Real Retool Workflows API call
@@ -127,54 +127,27 @@ class RetoolClient:
             )
             
             if response.status_code == 200:
-                print(f"   ✅ Workflow triggered successfully via API!")
-                print(f"   🎉 Check Retool Workflows dashboard for the run")
+                print(f"Workflow triggered successfully via API!")
+                print(f"Check Retool Workflows dashboard for the run")
                 print("="*70 + "\n")
                 return True
             else:
-                print(f"   ⚠️  API returned status {response.status_code}")
+                print(f"API returned status {response.status_code}")
                 print("="*70 + "\n")
                 return False
                 
         except Exception as e:
-            print(f"   ❌ API call failed: {e}")
+            print(f"API call failed: {e}")
             print("="*70 + "\n")
             return False
     
-    def log_incident_event(self, incident_id: str, event: Dict[str, Any]):
-        """Log an incident event to Retool for audit trail.
-        
-        Args:
-            incident_id: ID of the incident
-            event: Event details to log
-        """
-        # In production, send to Retool's workflow API
-        pass
     
     def get_approval_status(self, incident_id: str) -> str:
-        """Check approval status from Retool UI.
-        
-        Args:
-            incident_id: ID of the incident
-            
-        Returns:
-            Approval status: 'pending', 'approved', 'rejected'
-        """
-        # In production, query Retool API
         return "approved"  # Auto-approve for demo
     
     def push_dashboard_data(self, data_type: str, data: Dict[str, Any]) -> bool:
-        """Push data to Retool dashboard via API.
-        
-        Args:
-            data_type: Type of data ('statistics', 'incidents', 'timeline')
-            data: Data payload to push
-            
-        Returns:
-            True if data was pushed successfully
-        """
         if not self.api_key:
-            print(f"   ℹ️ [RETOOL] Dashboard data ready: {data_type}")
+            print(f"[RETOOL] Dashboard data ready: {data_type}")
             return True
         
         try:
@@ -196,25 +169,17 @@ class RetoolClient:
             )
             
             if response.status_code == 200:
-                print(f"   ✅ [RETOOL] Pushed {data_type} to dashboard")
+                print(f"[RETOOL] Pushed {data_type} to dashboard")
                 return True
             else:
-                print(f"   ⚠️ [RETOOL] Failed to push {data_type}: {response.status_code}")
+                print(f"[RETOOL] Failed to push {data_type}: {response.status_code}")
                 return False
                 
         except Exception as e:
-            print(f"   ⚠️ [RETOOL] Error pushing {data_type}: {e}")
+            print(f"[RETOOL] Error pushing {data_type}: {e}")
             return False
     
     def get_dashboard_url(self, incident_id: Optional[str] = None) -> str:
-        """Get URL to the Retool dashboard.
-        
-        Args:
-            incident_id: Optional incident ID to link directly to
-            
-        Returns:
-            URL to the Retool dashboard
-        """
         if incident_id:
             return f"{self.workspace_url}/apps/incident-autopilot?incidentId={incident_id}"
         return f"{self.workspace_url}/apps/incident-autopilot"

@@ -1,11 +1,3 @@
-"""Freepik integration for visual generation.
-
-Freepik provides visual assets for:
-- Incident card graphics
-- Timeline visualizations
-- Postmortem reports
-- Dashboard icons and illustrations
-"""
 import os
 import requests
 from typing import Dict, Optional
@@ -29,7 +21,7 @@ class FreepikClient:
         """
         if not self.api_key:
             incident_id = incident_data.get("id", "unknown")
-            print(f"   ℹ️ [FREEPIK] No API key - returning placeholder image")
+            print(f"[FREEPIK] No API key - returning placeholder image")
             return f"https://cdn.freepik.com/incident-cards/{incident_id}.png"
         
         print(f"   🔑 [FREEPIK] API key detected, generating AI image...")
@@ -58,50 +50,26 @@ class FreepikClient:
             if response.status_code == 200:
                 result = response.json()
                 image_url = result.get("data", [{}])[0].get("url", "")
-                print(f"   ✅ [FREEPIK] Successfully generated AI image via REAL API!")
-                print(f"   🖼️  [FREEPIK] Image URL: {image_url}")
+                print(f"[FREEPIK] Successfully generated AI image via REAL API!")
+                print(f"[FREEPIK] Image URL: {image_url}")
                 return image_url
             else:
-                print(f"   ⚠️ [FREEPIK] API returned {response.status_code}, using placeholder")
+                print(f"[FREEPIK] API returned {response.status_code}, using placeholder")
                 return f"https://cdn.freepik.com/fallback.png"
                 
         except Exception as e:
-            print(f"   ⚠️ [FREEPIK] API call failed: {e}")
+            print(f"[FREEPIK] API call failed: {e}")
             return f"https://cdn.freepik.com/error.png"
     
     def generate_timeline_graphic(self, timeline_events: list) -> str:
-        """Generate a visual timeline of incident progression.
-        
-        Args:
-            timeline_events: List of timeline events
-            
-        Returns:
-            URL or path to generated timeline graphic
-        """
         # In production, use Freepik to generate timeline visualization
         return "https://cdn.freepik.com/timeline-graphic.png"
     
     def generate_postmortem_cover(self, incident_summary: Dict) -> str:
-        """Generate a cover page for incident postmortem.
-        
-        Args:
-            incident_summary: Summary data for the incident
-            
-        Returns:
-            URL or path to generated cover page
-        """
         # In production, use Freepik templates for professional reports
         return "https://cdn.freepik.com/postmortem-cover.png"
     
     def get_icon(self, icon_type: str) -> str:
-        """Get an icon URL for dashboard/UI elements.
-        
-        Args:
-            icon_type: Type of icon needed (alert, success, warning, etc.)
-            
-        Returns:
-            URL to icon asset
-        """
         icons = {
             "alert": "🚨",
             "success": "✅",

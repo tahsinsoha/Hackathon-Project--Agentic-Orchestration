@@ -1,4 +1,3 @@
-"""Postcheck Agent: Verifies mitigation success and generates report."""
 from typing import Dict, Any
 from datetime import datetime
 from .base import BaseAgent
@@ -126,13 +125,13 @@ class PostcheckAgent(BaseAgent):
             f"{incident.applied_mitigation.description if incident.applied_mitigation else 'None'}",
             f"",
             f"## Recovery Status",
-            f"{'✅ Metrics recovered' if recovery_status['recovered'] else '⚠️ Metrics not fully recovered'}",
+            f"{' Metrics recovered' if recovery_status['recovered'] else 'Metrics not fully recovered'}",
             f"",
             f"## Metrics",
         ])
         
         for check_name, check_data in recovery_status.get("checks", {}).items():
-            status = "✅" if check_data.get("recovered") else "❌"
+            status = "Recovered" if check_data.get("recovered") else "Not Recovered"
             lines.append(f"- {status} {check_name}: {check_data}")
         
         lines.extend([
@@ -142,6 +141,5 @@ class PostcheckAgent(BaseAgent):
             f"- Add more comprehensive monitoring for early detection",
             f"- Update runbooks based on this incident",
         ])
-        
         return "\n".join(lines)
 
